@@ -1,14 +1,11 @@
-#!/usr/bin/env node
+require('dotenv').config();
 
 var locker = require("./apicall");
-
-var queue = 'idToLock';
-
 var amqp = require('amqplib/callback_api');
 
 let lockedIds = 0;
 
-amqp.connect('amqp://localhost', function(err, connection) {
+amqp.connect(process.env.CLOUDAMQP_URL, function(err, connection) {
     if (err) {
         console.log(err);
     }
@@ -17,15 +14,15 @@ amqp.connect('amqp://localhost', function(err, connection) {
             console.log(err);
         }
 
-        channel.assertQueue(queue, {
+        channel.assertQueue(process.env.QUEUE_NAME, {
             durable: true
         });
-        channel.prefetch(1);
 
-        console.log(" [*] Waiting for messages in %s. To exit press CTRL+C", queue);
-        
+        channel.prefetch(5);
 
-        channel.consume(queue, function(message) {
+        channel.consume(process.env.QUEUE_NAME, function(message) {
+            console.log("Processing %s", message.content.toString());
+
             setTimeout(async () =>{
             locker.profileLock(message.content.toString()).then((resolve) => {
                 lockedIds++;
@@ -36,7 +33,6 @@ amqp.connect('amqp://localhost', function(err, connection) {
             }, 0,1);
         }, 
         { noAck: false 
-        
         });
     });
     

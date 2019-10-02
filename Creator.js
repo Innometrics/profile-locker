@@ -1,52 +1,41 @@
-const request = require('request-promise')
+require('dotenv').config();
+
 const { createReadStream } = require('fs');
 const { createInterface } = require('readline');
 
 var amqp = require('amqplib/callback_api');
 
-var queue = 'idToLock';
 let sentLines = 0;
 
-amqp.connect('amqp://localhost', function(err, connection) {
+amqp.connect(process.env.CLOUDAMQP_URL, function(err, connection) {
     if (err) {
         console.log(err);
     }
+
     connection.createChannel(function(err, channel) {
         if (err) {
             console.log(err);
         } 
 
-        channel.assertQueue(queue, {
+        channel.assertQueue(process.env.QUEUE_NAME, {
             durable: true
         });
 
-
         const readline = createInterface({
-            input: createReadStream('pid.txt'),
+            input: createReadStream(process.env.FILE_PATH),
             creadlinefDelay: Infinity
-          });
-
-        
-
-
+        });
 
         readline.on('line', (line) => {
             setTimeout(async () =>{
-               await channel.sendToQueue(queue, new Buffer.from(line), { 
+               await channel.sendToQueue(process.env.QUEUE_NAME, new Buffer(line), { 
                     persistent: true });
                     sentLines++;
-            })
-                
-            
+            })        
         });
         
         readline.on('close', () => {
-            setTimeout(function() {
-                console.log("Done no more lines to read, ReadStream closed...");
-                console.log('Sent %s messages to the queue...',sentLines);
-                process.exit(0)
-              }, sentLines / 10);
-            
+            console.log("Done reading.");
         }) 
     });
 });
